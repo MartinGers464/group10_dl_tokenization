@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Checkpoints
+checkpoints/
+*.pt
+
+# Tokenizers data
+data/tokenizers/
+
+# Environment files
+.env
+*.swp
+
+# VSCode
+.vscode/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Logs
+logs/

@@ -23,6 +23,24 @@ conda activate token
 pip install -r requirements.txt
 ```
 
+Build the corpus
+
+```bash
+python -m src.tokenization.build_corpus
+```
+
+
+
+Build the tokenization
+
+```bash
+python -m src.tokenization.train_word
+python -m src.tokenization.train_bpe
+python -m src.tokenization.train_unigram
+
+```
+
+
 
 
 

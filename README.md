@@ -47,33 +47,20 @@ python -m src.tokenization.train_unigram
 
 Then train the models with different tokenizers
 
-```bash
-python -m src.training.train <tokenizer> <model_type>
-```
-
-
-
-Available tokenizers:
-
-word
-bpe
-unigram
-byte
-
-
-
-Available models:
-
-transformer
-lstm
-
-
-
-Examples:
 
 ```bash
 python -m src.training.train word transformer
+python -m src.training.train bpe transformer
+python -m src.training.train unigram transformer
+python -m src.training.train byte transformer
+
+
+python -m src.training.train word lstm
+python -m src.training.train bpe lstm
+python -m src.training.train unigram lstm
+python -m src.training.train byte lstm
 ```
+
 
 
 
@@ -89,14 +76,17 @@ Example: checkpoints/word_transformer_epoch4.pt
 
 Evaluate the results:
 
-```bash
-python -m src.evaluation.eval_model <tokenizer> <model_type> <checkpoint_path>
-```
-
-Example:
 
 ```bash
+python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt
 python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt
+python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt
+python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt
+
+python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt
+python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt
+python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt
+python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt
 ```
 
 
@@ -106,22 +96,6 @@ nll/token = 0.0457
 perplexity = 1.0468
 
 
-
-All training commands:
-
-```bash
-python -m src.training.train word transformer
-python -m src.training.train bpe transformer
-python -m src.training.train unigram transformer
-python -m src.training.train byte transformer
-
-
-
-python -m src.training.train word lstm
-python -m src.training.train bpe lstm
-python -m src.training.train unigram lstm
-python -m src.training.train byte lstm
-```
 
 
 

@@ -1,5 +1,5 @@
 config = {
-    "dataset_name": "roneneldan/TinyStories",
+    "dataset_name": "wikitext-2-raw-v1",
     "context_length": 128,
     "batch_size": 32,
     "num_epochs": 5,

@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from src.config import config
 from src.data.load_tinystories import load_tinystories
+from src.data.load_wiki2 import load_wiki2
 from src.data.make_dataloaders import make_dataloaders
 from src.tokenization.factory import get_tokenizer
 from src.models.transformer_lm import TransformerLM
@@ -19,12 +20,12 @@ def train_model(tokenizer_name: str, model_type: str):
 
     # 1) tokenizer and data
     tokenizer = get_tokenizer(tokenizer_name)
-    print("Loading TinyStories...")
-    train_ds, val_ds = load_tinystories()
-    print("Loaded TinyStories:", len(train_ds), "train stories,", len(val_ds), "val stories")
+    print("Loading Wiki2...")
+    train_ds, val_ds, test_ds = load_wiki2()
+    print("Loaded Wiki2:", len(train_ds), "train,", len(val_ds), "val", (test_ds), "test")
 
     print("Building tokenized datasets and dataloaders...")
-    train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
+    train_loader, val_loader, test_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
     print("Dataloaders ready. Starting epochs...")
     # train_ds, val_ds = load_tinystories()
     # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)

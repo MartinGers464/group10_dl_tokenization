@@ -40,6 +40,7 @@ def train_model(tokenizer_name: str, model_type: str):
             n_heads=config["num_heads"],
             n_layers=config["num_layers"],
             context_length=config["context_length"],
+            dropout=config["dropout"],
         )
     elif model_type == "lstm":
         model = LSTMLM(vocab_size, config["model_dim"])
@@ -47,7 +48,7 @@ def train_model(tokenizer_name: str, model_type: str):
         raise ValueError(f"Unknown model_type {model_type}")
 
     model = model.to(device)
-    optimizer = AdamW(model.parameters(), lr=config["learning_rate"])
+    optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
     # 3) training loop
     for epoch in range(config["num_epochs"]):

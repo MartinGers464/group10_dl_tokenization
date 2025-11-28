@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
 from tqdm import tqdm
+import math
 
 from src.config import config
 from src.data.load_tinystories import load_tinystories
@@ -13,6 +14,12 @@ from src.tokenization.factory import get_tokenizer
 from src.models.transformer_lm import TransformerLM
 from src.models.lstm_lm import LSTMLM
 
+def get_lr(step, warmup_steps, total_steps):
+        if step < warmup_steps:
+            return config["learning_rate"] * (step + 1) / warmup_steps
+        
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        return config["learning_rate"] * 0.5 * (1.0 + math.cos(math.pi * progress))
 
 def train_model(tokenizer_name: str, model_type: str):
     print(f"Starting training with tokenizer='{tokenizer_name}', model_type='{model_type}'")
@@ -30,6 +37,9 @@ def train_model(tokenizer_name: str, model_type: str):
     # train_ds, val_ds = load_tinystories()
     # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
 
+    total_steps = config["num_epochs"] * len(train_loader)
+    warmup_steps = int(0.05 * total_steps)
+
     vocab_size = tokenizer.vocab_size
 
     # 2) model
@@ -40,6 +50,7 @@ def train_model(tokenizer_name: str, model_type: str):
             n_heads=config["num_heads"],
             n_layers=config["num_layers"],
             context_length=config["context_length"],
+            dropout=config["dropout"],
         )
     elif model_type == "lstm":
         model = LSTMLM(vocab_size, config["model_dim"])
@@ -47,28 +58,36 @@ def train_model(tokenizer_name: str, model_type: str):
         raise ValueError(f"Unknown model_type {model_type}")
 
     model = model.to(device)
-    optimizer = AdamW(model.parameters(), lr=config["learning_rate"])
+    optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
     # 3) training loop
+    global_step = 0
     for epoch in range(config["num_epochs"]):
         print(f"Epoch {epoch} starting...")
         model.train()
         total_loss = 0.0
 
         for x, y in tqdm(train_loader, desc=f"{tokenizer_name}-{model_type} epoch {epoch}"):
+            lr = get_lr(global_step, warmup_steps, total_steps)
+            for g in optimizer.param_groups:
+                g["lr"] = lr
+
             x, y = x.to(device), y.to(device)
 
             logits = model(x)
             loss = F.cross_entropy(
                 logits.view(-1, vocab_size),
                 y.view(-1),
+                label_smoothing=0.1,
             )
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             total_loss += loss.item()
+            global_step += 1
 
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch}: train_loss={avg_loss:.4f}")

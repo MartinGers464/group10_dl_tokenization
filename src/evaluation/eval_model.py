@@ -45,17 +45,20 @@ def eval_val_loss(tokenizer_name, model_type, checkpoint_path, split: str = "val
     #train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
 
     if split == "val":
-        val_ds = val_ds
+        eval_ds = val_ds
     elif split == "test":
-        val_ds = test_ds
+        eval_ds = test_ds
+    elif split == "train": #just a test that there is no issue with training set eval
+        eval_ds = train_ds
     else:
         raise ValueError(f"Unknown split: {split} (expected 'val' or 'test')")
 
-    _, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
+    _, val_loader = make_dataloaders(train_ds, eval_ds, tokenizer, config)
     
+    # count total characters in eval_ds
     total_chars = 0
-    for ex in val_ds:
-        text = ex["text"]  # adjust if your loader uses a different key
+    for ex in eval_ds:
+        text = ex["text"]
         total_chars += len(text)
 
     total_loss = 0.0

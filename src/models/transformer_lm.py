@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+# GPT-like Transformer Language Model
 class TransformerLM(nn.Module):
     def __init__(self, vocab_size, model_dim, n_heads, n_layers, context_length):
         super().__init__()
@@ -20,5 +21,8 @@ class TransformerLM(nn.Module):
         pos = torch.arange(seq_len, device=x.device).unsqueeze(0).repeat(b, 1)
 
         h = self.token_emb(x) + self.pos_emb(pos)
-        h = self.encoder(h)
+        # Create causal mask
+        mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
+        # Pass mask to encoder
+        h = self.encoder(h, mask=mask)
         return self.fc(h)

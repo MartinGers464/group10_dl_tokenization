@@ -71,13 +71,17 @@ def eval_val_loss(tokenizer_name, model_type, checkpoint_path, split): # TODO! C
         for x, y in val_loader:
             x, y = x.to(device), y.to(device)
             logits = model(x)
+            non_pad_mask = (y != tokenizer.pad_id)
+            num_non_pad_tokens = non_pad_mask.sum().item()
             loss = F.cross_entropy(
                 logits.view(-1, tokenizer.vocab_size),
                 y.view(-1),
                 reduction="sum",
+                ignore_index=tokenizer.pad_id
             )
             total_loss += loss.item()
-            total_tokens += y.numel()
+            # total_tokens += y.numel()
+            total_tokens += num_non_pad_tokens
 
     avg_nll = total_loss / total_tokens          # nats per token
     ppl = math.exp(avg_nll)                      # perplexity

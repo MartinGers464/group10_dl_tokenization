@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import torch
@@ -27,13 +28,22 @@ def train_model(tokenizer_name: str, model_type: str):
 
     # 1) tokenizer and data
     tokenizer = get_tokenizer(tokenizer_name)
+    pad_id = tokenizer.pad_id
+    print(f"pad:{pad_id}")
+
     print("Loading Wiki2...")
-    train_ds, val_ds, test_ds = load_wiki2()
-    print("Loaded Wiki2:", len(train_ds), "train,", len(val_ds), "val", (test_ds), "test")
+    train_raw, val_raw, test_raw = load_wiki2()
+    print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", (test_raw), "test")
+
+    train_texts = [ex["text"] for ex in train_raw]
+    val_texts   = [ex["text"] for ex in val_raw]
 
     print("Building tokenized datasets and dataloaders...")
-    train_loader, val_loader= make_dataloaders(train_ds, val_ds, tokenizer, config)
+    train_loader, val_loader, train_ds, val_ds = make_dataloaders(train_raw, val_raw, tokenizer, config)
     print("Dataloaders ready. Starting epochs...")
+
+    # train_loader, val_loader= make_dataloaders(train_ds, val_ds, tokenizer, config)
+    # print("Dataloaders ready. Starting epochs...")
     # train_ds, val_ds = load_tinystories()
     # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
 
@@ -79,6 +89,7 @@ def train_model(tokenizer_name: str, model_type: str):
                 logits.view(-1, vocab_size),
                 y.view(-1),
                 label_smoothing=0.1,
+                ignore_index=pad_id,
             )
 
             optimizer.zero_grad()
@@ -89,14 +100,86 @@ def train_model(tokenizer_name: str, model_type: str):
             total_loss += loss.item()
             global_step += 1
 
-        avg_loss = total_loss / len(train_loader)
-        print(f"Epoch {epoch}: train_loss={avg_loss:.4f}")
+        train_loss = total_loss / len(train_loader)
+        print(f"Epoch {epoch}: train_loss={train_loss:.4f}")
+
+         # results folder
+        os.makedirs("results", exist_ok=True)
+        results = []
+        # ---- validation ----
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x, y = x.to(device), y.to(device)
+                logits = model(x)
+                vloss = F.cross_entropy(
+                    logits.view(-1, vocab_size),
+                    y.view(-1),
+                    ignore_index=pad_id)
+                val_loss += vloss.item()
+
+        val_loss /= len(val_loader)
+
+        # ---- compute metrics ----
+        # 1. nll per token
+        nll_token = val_loss                        # in nats
+
+        # 2. perplexity
+        ppl = math.exp(nll_token)
+
+        # 3. bits per token
+        bits_per_token = nll_token / math.log(2)
+
+        # character counts for val set
+        total_chars = sum(len(t) for t in val_texts)
+
+        # total tokens in validation pass
+        # total_tokens = len(val_loader) * config["batch_size"] * config["context_length"]
+        total_tokens = len(val_ds.ids)
+
+        tokens_per_char = total_tokens / total_chars
+
+        # 4. nll per char
+        nll_per_char = (nll_token * total_tokens) / total_chars
+
+        # 5. bits per char
+        bpc = nll_per_char / math.log(2)
+
+        # ---- print metrics ----
+        print(f"Epoch {epoch}:")
+        print(f"  nll/token       = {nll_token:.4f} nats")
+        print(f"  perplexity      = {ppl:.4f}")
+        print(f"  bits per token  = {bits_per_token:.4f}")
+        print(f"  nll/char        = {nll_per_char:.4f} nats")
+        print(f"  bits per char   = {bpc:.4f} bits")
+        print(f"  tokens per char = {tokens_per_char:.4f}")
+
+           # ---- save JSON metrics ----
+        results.append({
+            "epoch": epoch,
+            "nll_token": nll_token,
+            "perplexity": ppl,
+            "bits_per_token": bits_per_token,
+            "nll_per_char": nll_per_char,
+            "bits_per_char": bpc,
+            "tokens_per_char": tokens_per_char,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "lr": lr,
+        })
+
+        with open(f"results/metrics_{tokenizer_name}_{model_type}.json", "w") as f:
+            json.dump(results, f, indent=2)
+
 
         os.makedirs("checkpoints", exist_ok=True)
         # (optional) save checkpoint
         out_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
         torch.save(model.state_dict(), out_path)
         print(f"Saved checkpoint to {out_path}")
+
+
 
 
 if __name__ == "__main__":

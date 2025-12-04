@@ -78,9 +78,6 @@ jupyter notebook \
   --ServerApp.password=''
 ```
 
-Now open notebook, select kernel from top right corner and select `another kernel` and `existing jupyter server`
-
-Then input `http://n-62-12-19:8890` and press `enter` to get access to the server
 
 ### **Connect from notebook / VS Code**
 
@@ -88,6 +85,7 @@ Then input `http://n-62-12-19:8890` and press `enter` to get access to the serve
 2. Select **Existing Jupyter Server** from **select kernel** from top right corner
 3. Enter: `http://n-62-12-19:8890`
 4. Select kernel: `Python (token)`
+5. press `enter` to get access to the server if it asks for password
 
 Now you can run all model training inside the notebook environment.
 

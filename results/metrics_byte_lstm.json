@@ -1,6 +1,7 @@
 [
   {
     "epoch": 0,
+    "split": "val",
     "nll_token": 1.6625446566878208,
     "perplexity": 5.272711027162006,
     "bits_per_token": 2.398544931459963,
@@ -13,6 +14,7 @@
   },
   {
     "epoch": 1,
+    "split": "val",
     "nll_token": 1.6218432170421178,
     "perplexity": 5.062412847835573,
     "bits_per_token": 2.339825166326066,
@@ -25,6 +27,7 @@
   },
   {
     "epoch": 2,
+    "split": "val",
     "nll_token": 1.6104223020374775,
     "perplexity": 5.004924371369222,
     "bits_per_token": 2.3233482688864573,
@@ -37,6 +40,7 @@
   },
   {
     "epoch": 3,
+    "split": "val",
     "nll_token": 1.606140553520911,
     "perplexity": 4.983540357022517,
     "bits_per_token": 2.3171710115352733,
@@ -49,6 +53,7 @@
   },
   {
     "epoch": 4,
+    "split": "val",
     "nll_token": 1.6052784281836807,
     "perplexity": 4.979245772112849,
     "bits_per_token": 2.3159272275866263,

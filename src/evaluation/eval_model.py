@@ -1,3 +1,4 @@
+import json
 import sys
 import math
 import torch
@@ -34,11 +35,15 @@ def eval_val_loss(tokenizer_name, model_type, checkpoint_path, split): # TODO! C
     device = config["device"]
     tokenizer = get_tokenizer(tokenizer_name)
 
+
     # build model and load weights
     model = build_model(tokenizer, model_type)
+
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.to(device)
     model.eval()
+    pad_id = tokenizer.pad_id
+    vocab_size = tokenizer.vocab_size
 
     # load data (same subset)
     train_ds, val_ds, test_ds = load_wiki2()
@@ -54,7 +59,18 @@ def eval_val_loss(tokenizer_name, model_type, checkpoint_path, split): # TODO! C
     else:
         raise ValueError(f"Unknown split: {split} (expected 'val' or 'test')")
 
-    _, val_loader = make_dataloaders(train_ds, eval_ds, tokenizer, config)
+    train_raw, val_raw, test_raw = load_wiki2()
+    # print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", len(test_raw), "test")
+
+    train_texts = [ex["text"] for ex in train_raw]
+    val_texts   = [ex["text"] for ex in val_raw]
+    test_texts  = [ex["text"] for ex in test_raw]
+
+    print("Building tokenized datasets and dataloaders...")
+    # NOTE: make_dataloaders must now also build test_loader, test_ds
+    # _, val_loader = make_dataloaders(train_ds, eval_ds, tokenizer, config)
+
+    train_loader, val_loader, test_loader, train_ds, val_ds, test_ds = make_dataloaders(train_raw, val_raw, test_raw, tokenizer, config)
     
     # count total characters in eval_ds
     total_chars = 0
@@ -67,43 +83,60 @@ def eval_val_loss(tokenizer_name, model_type, checkpoint_path, split): # TODO! C
     total_loss = 0.0
     total_tokens = 0
 
+ # compute test metrics
+    print("Evaluating on TEST set with final model...")
+    model.eval()
+    test_loss = 0.0
     with torch.no_grad():
-        for x, y in val_loader:
+        for x, y in test_loader:
             x, y = x.to(device), y.to(device)
             logits = model(x)
-            non_pad_mask = (y != tokenizer.pad_id)
-            num_non_pad_tokens = non_pad_mask.sum().item()
-            loss = F.cross_entropy(
-                logits.view(-1, tokenizer.vocab_size),
+            tloss = F.cross_entropy(
+                logits.view(-1, vocab_size),
                 y.view(-1),
-                reduction="sum",
-                ignore_index=tokenizer.pad_id
+                ignore_index=pad_id
             )
-            total_loss += loss.item()
-            # total_tokens += y.numel()
-            total_tokens += num_non_pad_tokens
+            test_loss += tloss.item()
 
-    avg_nll = total_loss / total_tokens          # nats per token
-    ppl = math.exp(avg_nll)                      # perplexity
+    test_loss /= len(test_loader)
+      # compute test metrics
+    nll_token = test_loss
+    ppl = math.exp(nll_token)
+    bits_per_token = nll_token / math.log(2)
 
-    nll_per_char = total_loss / total_chars            # nats per character
-    bpc = nll_per_char / math.log(2.0)                 # bits per character
+    total_chars_test = sum(len(t) for t in test_texts)
+    total_tokens_test = len(test_ds.ids)
+    tokens_per_char = total_tokens_test / total_chars_test
 
-    tokens_per_char = total_tokens / total_chars
-    bits_per_token = (total_loss / math.log(2.0)) / total_tokens
+    nll_per_char = (nll_token * total_tokens_test) / total_chars_test
+    bpc = nll_per_char / math.log(2)
 
-    nll_per_byte = total_loss / total_bytes
+    total_bytes_test = sum(len(t.encode("utf-8")) for t in test_texts)
+    total_nll_test = nll_token * total_tokens_test        
+    nll_per_byte = total_nll_test / total_bytes_test
     bits_per_byte = nll_per_byte / math.log(2.0)
-    #print(f"Validation: nll/token={avg_nll:.4f}, perplexity={ppl:.4f}")
-    print(f"{split} split results for tokenizer='{tokenizer_name}', model='{model_type}':")
-    print(f"  nll/token       = {avg_nll:.4f} nats")
-    print(f"  perplexity      = {ppl:.4f}")
-    print(f"  nll/char        = {nll_per_char:.4f} nats")
-    print(f"  bits per char   = {bpc:.4f} bits")
-    print(f"  nll/byte        = {nll_per_byte:.4f} nats")
-    print(f"  bits per byte   = {bits_per_byte:.4f} bits")
-    print(f"  tokens per char = {tokens_per_char:.4f}") # Compression Rate
-    print(f"  bits per token  = {bits_per_token:.4f}")
+
+    print("TEST metrics:")
+    print(f"  [TEST] nll/token       = {nll_token:.4f} nats")
+    print(f"  [TEST] perplexity      = {ppl:.4f}")
+    print(f"  [TEST] bits per token  = {bits_per_token:.4f}")
+    print(f"  [TEST] nll/char        = {nll_per_char:.4f} nats")
+    print(f"  [TEST] bits per char   = {bpc:.4f} bits")
+    print(f"  [TEST] tokens per char = {tokens_per_char:.4f}")
+    print(f"  [TEST] bits per byte   = {bits_per_byte:.4f}")
+
+    test_results = {
+        "split": "test",
+        "nll_token": nll_token,
+        "perplexity": ppl,
+        "bits_per_token": bits_per_token,
+        "nll_per_char": nll_per_char,
+        "bits_per_char": bpc,
+        "tokens_per_char": tokens_per_char,
+        "bits_per_byte": bits_per_byte,
+    }
+    with open(f"results/test_metrics_{tokenizer_name}_{model_type}.json", "w") as f:
+        json.dump(test_results, f, indent=2)
 
 def main():
     if len(sys.argv) != 5:
@@ -116,6 +149,8 @@ def main():
     split = sys.argv[4]          # "val", "test", or "train"
 
     eval_val_loss(tok_name, model_type, ckpt, split)
+
+    
 
 
 if __name__ == "__main__":
